@@ -10,6 +10,19 @@ struct year {
 
 struct year *years[10000]={NULL};
 
+
+int endofmonth(int mday,int month, int year) {
+  if (month<1||month>12) return 1;
+  int days_in_month=31;
+  switch(month) {
+  case 4: case 6: case 9: case 11: days_in_month=30; break;
+  case 2:
+    if (year%4) days_in_month=28; else days_in_month=29;
+    if ((!(year%100))&&(!(year%400))) days_in_month=28;
+  }
+  if (mday>days_in_month) return 1; else return 0;
+}
+
 int process_line(char *line)
 {
   int offset=0;
@@ -69,8 +82,42 @@ int process_line(char *line)
     }
     if (initial_charge_level>100) initial_charge_level=100;
 
-    printf("Charge level = %0.3f @ %02d:%02d\n",
-	   initial_charge_level,start_hour,start_min);
+    if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
+		  initial_charge_level,start_hour,start_min);
+
+    while (duration) {
+      if (initial_charge_level <= 0 ) {
+	// Mark effect of outage
+	printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
+	       customers,
+	       start_mday,start_month,start_year,
+	       start_hour,start_min,
+	       end_mday,end_month,end_year,
+	       end_hour,end_min,
+	       duration
+	       );
+	break;
+      } else {
+	if (start_year<100) start_year+=2000;
+	if (end_year<100) end_year+=2000;
+	initial_charge_level -= minutely_discharge;
+	duration--;
+	start_min++;
+	if (start_min>=60) {
+	  start_min=0; start_hour++;
+	  if (start_hour>=24) {
+	    start_hour=0; start_mday++;
+	    if (endofmonth(start_mday,start_month,start_year)) {
+	      start_mday=1; start_month++;
+	      if (start_month>12) {
+		start_month=1; start_year++;
+	      }
+	    }
+	  }
+	}
+	  
+      }
+    }
   }
 
   return 0;
