@@ -5,7 +5,7 @@
 int battery_life_in_minutes=0;
 
 struct year {
-  int counts[12][31][24];
+  int counts[13][32][24];
 };
 
 struct year *years[10000]={NULL};
@@ -88,7 +88,8 @@ int process_line(char *line)
     while (duration>0) {
       if (initial_charge_level <= 0 ) {
 	// Mark effect of outage
-	printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
+	if (0)
+	  printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
 	       customers,
 	       start_mday,start_month,start_year,
 	       start_hour,start_min,
@@ -99,9 +100,10 @@ int process_line(char *line)
 
 	// Now mark the hourly bins to record the outage
 	while(duration>0) {
-	  printf("    still flat at %d/%d/%d %02d:00\n",
-		 start_mday,start_month,start_year,
-		 start_hour);
+	  if (0)
+	    printf("    still flat at %d/%d/%d %02d:00\n",
+		   start_mday,start_month,start_year,
+		   start_hour);
 	  
 	  if (!years[start_year]) {
 	    years[start_year]=calloc(1,sizeof(struct year));
@@ -160,27 +162,64 @@ int main(int argc,char **argv)
     exit(-1);
   }
 
-  for(int i=0;i<10000;i++) years[i]=NULL;
+    for(int i=0;i<10000;i++) {
+      years[i]=NULL;
+    }
 
-  battery_life_in_minutes=atoi(argv[1]);
+  
+  int max_battery_life_in_minutes=atoi(argv[1]);
   char *data_file=argv[2];
 
-  FILE *f=fopen(data_file,"r");
-
-  char line[1024];
-  int line_len=0;
-  int c;
-  
-  while ((c=fgetc(f))!=EOF) {
-    if (c>=' ') {
-      line[line_len++]=c;
-      line[line_len]=0;
-    } else {    
-      process_line(line);
-      line_len=0;
+  battery_life_in_minutes=0;
+  while(battery_life_in_minutes<=max_battery_life_in_minutes) {
+    
+    for(int i=0;i<10000;i++) {
+      if (years[i]) free(years[i]);
+      years[i]=NULL;
     }
+    
+    FILE *f=fopen(data_file,"r");
+    
+    char line[1024];
+    int line_len=0;
+    int c;
+    
+    while ((c=fgetc(f))!=EOF) {
+      if (c>=' ') {
+	line[line_len++]=c;
+	line[line_len]=0;
+      } else {    
+	process_line(line);
+	line_len=0;
+      }
+    }
+    if (line_len) process_line(line);
+    fclose(f);
+    
+    long long total=0;
+    
+    // Write hourly impact histogram
+    //    printf("time;flat_phones\n");
+    for(int y=0;y<10000;y++)
+      if (years[y]) {
+	for(int month=1;month<12;month++) {
+	  for(int mday=1;mday<31;mday++) {
+	    for(int hour=0;hour<24;hour++) {
+	      int count=years[y]->counts[month][mday][hour];
+	      total+=count;
+	      //	    if (count>0)
+	      {
+		//		printf("%04d-%02d-%02d %02d:00:00;%d\n",y,month,mday,hour,count);
+	      }
+	    }
+	  }
+	}
+      }
+    
+    fprintf(stdout,"%d,%lld\n",battery_life_in_minutes/60,total);
+
+    battery_life_in_minutes+=60;
   }
-  if (line_len) process_line(line);    
   
   return 0;
 }
