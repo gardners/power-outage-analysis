@@ -5,7 +5,7 @@
 int battery_life_in_minutes=0;
 
 struct year {
-  int count[12][31][24];
+  int counts[12][31][24];
 };
 
 struct year *years[10000]={NULL};
@@ -85,7 +85,7 @@ int process_line(char *line)
     if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
 		  initial_charge_level,start_hour,start_min);
 
-    while (duration) {
+    while (duration>0) {
       if (initial_charge_level <= 0 ) {
 	// Mark effect of outage
 	printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
@@ -96,6 +96,36 @@ int process_line(char *line)
 	       end_hour,end_min,
 	       duration
 	       );
+
+	// Now mark the hourly bins to record the outage
+	while(duration>0) {
+	  printf("    still flat at %d/%d/%d %02d:00\n",
+		 start_mday,start_month,start_year,
+		 start_hour);
+	  
+	  if (!years[start_year]) {
+	    years[start_year]=calloc(1,sizeof(struct year));
+	    if (!years[start_year]) {
+	      perror("calloc"); exit(-1);
+	    }
+	  }
+	  years[start_year]->counts[start_month][start_mday][start_hour]+=customers;
+
+	  // Now advance an hour
+	  start_hour++;
+	  if (start_hour>=24) {
+	    start_hour=0; start_mday++;
+	    if (endofmonth(start_mday,start_month,start_year)) {
+	      start_mday=1; start_month++;
+	      if (start_month>12) {
+		start_month=1; start_year++;
+	      }
+	    }
+	  }
+	  
+	  duration-=60;
+	}
+	
 	break;
       } else {
 	if (start_year<100) start_year+=2000;
@@ -129,6 +159,8 @@ int main(int argc,char **argv)
     fprintf(stderr,"usage: analyse <battery life in minutes> <data file>\n");
     exit(-1);
   }
+
+  for(int i=0;i<10000;i++) years[i]=NULL;
 
   battery_life_in_minutes=atoi(argv[1]);
   char *data_file=argv[2];
