@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int battery_life_in_minutes=0;
 
@@ -158,16 +159,15 @@ int process_line(char *line)
 int main(int argc,char **argv)
 {
   if (argc!=3) {
-    fprintf(stderr,"usage: analyse <battery life in minutes> <data file>\n");
+    fprintf(stderr,"usage: analyse <battery life in hours> <data file>\n");
     exit(-1);
   }
 
-    for(int i=0;i<10000;i++) {
-      years[i]=NULL;
-    }
-
+  for(int i=0;i<10000;i++) years[i]=NULL;
   
-  int max_battery_life_in_minutes=atoi(argv[1]);
+  unlink("flatbatteryhours_versus_batterylife.csv");
+  
+  int max_battery_life_in_minutes=atoi(argv[1])*60;
   char *data_file=argv[2];
 
   battery_life_in_minutes=0;
@@ -197,9 +197,15 @@ int main(int argc,char **argv)
     fclose(f);
     
     long long total=0;
+
+    char filename[1024];
+    snprintf(filename,1024,"numberofflatphones_by_hour_batterylife=%dhours.csv",
+	     battery_life_in_minutes/60);
+    
+    f=fopen(filename,"w");
     
     // Write hourly impact histogram
-    //    printf("time;flat_phones\n");
+    fprintf(f,"time;flat_phones\n");   
     for(int y=0;y<10000;y++)
       if (years[y]) {
 	for(int month=1;month<12;month++) {
@@ -209,16 +215,21 @@ int main(int argc,char **argv)
 	      total+=count;
 	      //	    if (count>0)
 	      {
-		//		printf("%04d-%02d-%02d %02d:00:00;%d\n",y,month,mday,hour,count);
+		fprintf(f,"%04d-%02d-%02d %02d:00:00;%d\n",y,month,mday,hour,count);
 	      }
 	    }
 	  }
 	}
       }
+    fclose(f);
     
-    fprintf(stdout,"%d,%lld\n",battery_life_in_minutes/60,total);
+    f=fopen("flatbatteryhours_versus_batterylife.csv","a");
+    fprintf(f,"%d,%lld\n",battery_life_in_minutes/60,total);
+    fclose(f);
 
     battery_life_in_minutes+=60;
+    printf("Analysing situation with battery life = %d hours.\n",
+	   battery_life_in_minutes/60);
   }
   
   return 0;
