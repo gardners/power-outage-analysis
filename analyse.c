@@ -3,6 +3,18 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "ft2build.h"
+#include FT_FREETYPE_H
+#include "hpdf.h"
+
+void error_handler(HPDF_STATUS error_number, HPDF_STATUS detail_number,
+		   void *data)
+{
+  fprintf(stderr,"HPDF error: %04x.%u\n",
+	  (HPDF_UINT)error_number,(HPDF_UINT)detail_number);
+  exit(-1);
+}
+
 int battery_life_in_minutes=0;
 
 struct year {
@@ -166,6 +178,22 @@ int main(int argc,char **argv)
     exit(-1);
   }
 
+  HPDF_Doc pdf;
+
+  HPDF_Page page;
+
+  pdf = HPDF_New(error_handler,NULL);
+  if (!pdf) {
+    fprintf(stderr,"Call to HPDF_New() failed.\n"); exit(-1); 
+  }
+  HPDF_SetCompressionMode (pdf, HPDF_COMP_ALL);
+  HPDF_SetPageLayout(pdf,HPDF_PAGE_LAYOUT_TWO_COLUMN_LEFT);
+  HPDF_AddPageLabel(pdf, 1, HPDF_PAGE_NUM_STYLE_DECIMAL, 1, "");
+
+  HPDF_UseUTFEncodings(pdf); 
+  HPDF_SetCurrentEncoder(pdf, "UTF-8"); 
+
+  
   for(int i=0;i<10000;i++) years[i]=NULL;
   
   unlink("flatbatteryhours_versus_batterylife.csv");
@@ -204,17 +232,45 @@ int main(int argc,char **argv)
     char filename[1024];
     snprintf(filename,1024,"numberofflatphones_by_hour_batterylife=%dhours.csv",
 	     battery_life_in_minutes/60);
-    
+
     f=fopen(filename,"w");
     
     // Write hourly impact histogram
-    fprintf(f,"time,flat_phones\n");   
+    fprintf(f,"time,flat_phones\n");
+    int previous_count=0;
+    int climbing=0;
+    int steady=0;
+    int inevent=0;
+    int peak=0;
     for(int y=0;y<10000;y++)
       if (years[y]) {
 	for(int month=1;month<12;month++) {
 	  for(int mday=1;mday<31;mday++) {
 	    for(int hour=0;hour<24;hour++) {
 	      int count=years[y]->counts[month][mday][hour];
+
+	      if ((count-previous_count)>1000) {
+		climbing++;
+	      } else climbing=0;
+	      if (((count-previous_count)<100)&&
+		  ((count-previous_count)>-100)) steady++; else steady=0;
+	      
+	      if (climbing==2&&(!inevent)) {
+		printf("Major event on %04d-%02d-%02d %02d:00 (count=%d)\n",
+		       y,month,mday,hour,count);
+		peak=count;
+		inevent++;
+	      }
+	      if ((count<(peak/10))||(count<1000)) {
+		if (inevent>0) {
+		  printf("  event appears to end on %04d-%02d-%02d %02d:00 (count=%d, peak=%d)\n",
+			 y,month,mday,hour,count,peak);
+
+		  inevent--;
+		}
+	      } else if (inevent) if (count>peak) peak=count;
+	      previous_count=count;
+	      
 	      total+=count;
 	      //	    if (count>0)
 	      {
@@ -225,6 +281,10 @@ int main(int argc,char **argv)
 	}
       }
     fclose(f);
+
+    //    draw_pdf_diagram(battery_life_in_minutes/60,pdf,page);
+    
+    
     
     f=fopen("flatbatteryhours_versus_batterylife.csv","a");
     if (!battery_life_in_minutes)
