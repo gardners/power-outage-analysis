@@ -205,7 +205,7 @@ int main(int argc,char **argv)
     f=fopen(filename,"w");
     
     // Write hourly impact histogram
-    fprintf(f,"time;flat_phones\n");   
+    fprintf(f,"time,flat_phones\n");   
     for(int y=0;y<10000;y++)
       if (years[y]) {
 	for(int month=1;month<12;month++) {
@@ -215,7 +215,7 @@ int main(int argc,char **argv)
 	      total+=count;
 	      //	    if (count>0)
 	      {
-		fprintf(f,"%04d-%02d-%02d %02d:00:00;%d\n",y,month,mday,hour,count);
+		fprintf(f,"%04d-%02d-%02d %02d:00:00,%d\n",y,month,mday,hour,count);
 	      }
 	    }
 	  }
