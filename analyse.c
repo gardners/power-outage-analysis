@@ -48,6 +48,9 @@ int process_line(char *line)
 	     &end_mday,&end_month,&end_year,&end_hour,&end_min,
 	     &customers)==12) {
 
+    if (start_year<100) start_year+=2000;
+    if (end_year<100) end_year+=2000;
+    
     /* Our algorithm is simple:
 
        Assumptions:
@@ -224,6 +227,8 @@ int main(int argc,char **argv)
     fclose(f);
     
     f=fopen("flatbatteryhours_versus_batterylife.csv","a");
+    if (!battery_life_in_minutes)
+      fprintf(f,"batterylifeinhours,totalflatbatteryhours\n");
     fprintf(f,"%d,%lld\n",battery_life_in_minutes/60,total);
     fclose(f);
 
