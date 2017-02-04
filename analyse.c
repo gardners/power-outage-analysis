@@ -248,6 +248,20 @@ int line(HPDF_Page *page,
   return 0;
 }
 
+float fig_width=6*72;
+float fig_height=5*72;
+float x_left=0.75*72;
+float y_bottom=0.75*72;
+float x_right=0.25*72;
+float y_top=0.25*72;
+
+int y_tick(HPDF_Page *page,int value,float barscale)
+{
+  line(page,0,0,0,1,
+       x_left-4.5,y_bottom+(value*barscale),
+       x_left,y_bottom+(value*barscale));
+  return 0;
+}
 
 int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 					   int battery_life_in_hours,
@@ -256,14 +270,6 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   HPDF_Doc pdf;
 
   HPDF_Page page;
-
-  float fig_width=6*72;
-  float fig_height=5*72;
-  float x_left=0.75*72;
-  float y_bottom=0.75*72;
-  float x_right=0.25*72;
-  float y_top=0.25*72;
-
   
   pdf = HPDF_New(error_handler,NULL);
   if (!pdf) {
@@ -322,8 +328,15 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
   // Draw furniture
 
-  line(&page,0,0,0,1,x_left,y_bottom,fig_width-x_right+(x_right/2),y_bottom);
-  line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top+(x_right/2));
+  // Axis lines
+  line(&page,0,0,0,1,x_left,y_bottom,fig_width-x_right+4.5,y_bottom);
+  line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top+4.5);
+
+  // Y-axis scale ticks
+  // 0 and maximum range:
+  y_tick(&page,0,barscale);
+  y_tick(&page,peak,barscale);
+  // Some round numbers in between	
 
   
   HPDF_SaveToFile(pdf,filename);
