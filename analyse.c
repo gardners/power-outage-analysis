@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "ft2build.h"
 #include FT_FREETYPE_H
@@ -254,12 +255,54 @@ float x_left=0.75*72;
 float y_bottom=0.75*72;
 float x_right=0.25*72;
 float y_top=0.25*72;
+HPDF_Font font_helvetica=NULL;
+
+int draw_text(HPDF_Page *page,
+	      char *text, float size,
+	      float r, float g, float b,
+	      float x, float y, float radians,
+	      int halign, int valign)
+{
+  HPDF_Page_SetFontAndSize (*page, font_helvetica, size);
+
+  float text_width=HPDF_Page_TextWidth(*page,text);
+  float text_height=HPDF_Font_GetCapHeight(font_helvetica);
+  text_height=text_height*size/1000.0;
+
+  if (halign==+1) x-=text_width;
+  if (halign==0) x-=text_width/2;
+  if (valign==+1) y-=text_height;
+  if (valign==0) y-=text_height/2;
+  
+  HPDF_Page_BeginText (*page);
+  HPDF_Page_SetTextRenderingMode (*page, HPDF_FILL);
+  HPDF_Page_SetRGBFill (*page, r,g,b);
+  HPDF_Page_SetTextMatrix (*page,
+			   cos(radians), sin(radians),
+			   -sin(radians), cos(radians),
+			   x, y);
+  //  HPDF_MoveTo(x,y);
+  HPDF_Page_ShowText (*page, text);
+  HPDF_Page_EndText (*page);
+
+  return 0;
+}
 
 int y_tick(HPDF_Page *page,int value,float barscale)
 {
   line(page,0,0,0,1,
        x_left-4.5,y_bottom+(value*barscale),
        x_left,y_bottom+(value*barscale));
+
+  char value_string[1024];
+  snprintf(value_string,1024,"%d",value);
+  draw_text(page,
+	    value_string,10,
+	    0,0,0,	   
+	    x_left-4.5-2.0,y_bottom+(value*barscale),
+	    0,
+	    +1,0);
+  
   return 0;
 }
 
@@ -282,8 +325,10 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   HPDF_UseUTFEncodings(pdf); 
   HPDF_SetCurrentEncoder(pdf, "UTF-8"); 
 
-  page = HPDF_AddPage(pdf);
+  font_helvetica = HPDF_GetFont(pdf,"Helvetica","CP1250");
   
+  page = HPDF_AddPage(pdf);
+
   // Page size in points
   // XXX - adjust accordingly
   HPDF_Page_SetWidth(page,fig_width);
