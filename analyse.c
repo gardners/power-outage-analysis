@@ -216,10 +216,10 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
 
 int filled_rectange(HPDF_Page *page,
 		    float r,float g,float b,
-		    int x1,int y1, int x2, int y2)
+		    float x1,float y1, float x2, float y2)
 {
   HPDF_Page_SetRGBFill (*page, r,g,b);
-  HPDF_Page_Rectangle(*page, x1,y1,x2-x1,y2-y1);
+  HPDF_Page_Rectangle(*page, x1,y1,x2,y2);
   HPDF_Page_Fill(*page);
   return 0;
 }
@@ -233,6 +233,12 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
   HPDF_Page page;
 
+  float fig_width=6*72;
+  float fig_height=5*72;
+  float x_left=0.75*72;
+  float y_bottom=0.75*72;
+
+  
   pdf = HPDF_New(error_handler,NULL);
   if (!pdf) {
     fprintf(stderr,"Call to HPDF_New() failed.\n"); exit(-1); 
@@ -248,8 +254,8 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   
   // Page size in points
   // XXX - adjust accordingly
-  HPDF_Page_SetWidth(page,72*6);
-  HPDF_Page_SetHeight(page,72*5);
+  HPDF_Page_SetWidth(page,fig_width);
+  HPDF_Page_SetHeight(page,fig_height);
 
   // How many bars to draw? (and what is peak value?)
   int timespan_in_hours=0;
@@ -263,9 +269,9 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     ts_advance(&cursor); timespan_in_hours++;    
   }
 
-  float barwidth=(5*72.0)/timespan_in_hours;
+  float barwidth=(fig_width-x_left-0.25*72)/timespan_in_hours;
 
-  float barscale=(4*72.0)/peak;
+  float barscale=(fig_height-y_bottom-0.25*72)/peak;
 
   fprintf(stderr,"Drawing barplot spanning %d hours, bardwidth=%f, scale=%f\n",
 	  timespan_in_hours,barwidth,barscale);
@@ -273,14 +279,16 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   cursor=*start;
   int barnumber=0;
   while(ts_notequal(&cursor,end)) {
-    float x = (1*72) + barwidth*barnumber;
+    float x = x_left + barwidth*barnumber;
     int count=0;
     if (years[cursor.year])
       count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
+
+    float height=count*barscale;
     
-    filled_rectange(&page,0.5,0.5,0.5,x,x+barwidth,
-		    (1*72.0),
-		    (1*72.0)+(count*barscale));
+    filled_rectange(&page,0.5,0.5,0.5,
+		    x,barwidth,
+		    y_bottom,height);
     
     ts_advance(&cursor);
     barnumber++;
