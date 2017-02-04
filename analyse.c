@@ -46,6 +46,10 @@ int ts_notequal(timestamp *a,timestamp *b)
   if (a->month!=b->month) return 1;
   if (a->mday!=b->mday) return 1;
   if (a->hour!=b->hour) return 1;
+  if (0)
+    printf("%02d/%02d/%04d %02d:00 = %02d/%02d/%04d %02d:00\n",
+	   a->mday,a->month,a->year,a->hour,
+	   b->mday,b->month,b->year,b->hour);
   return 0;
 }
 
@@ -210,6 +214,87 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
   return 0;
 }
 
+int filled_rectange(HPDF_Page *page,
+		    float r,float g,float b,
+		    int x1,int y1, int x2, int y2)
+{
+  HPDF_Page_SetRGBFill (*page, r,g,b);
+  HPDF_Page_Rectangle(*page, x1,y1,x2-x1,y2-y1);
+  HPDF_Page_Fill(*page);
+  return 0;
+}
+
+
+int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
+					   int battery_life_in_hours,
+					   timestamp *start,timestamp *end)
+{
+  HPDF_Doc pdf;
+
+  HPDF_Page page;
+
+  pdf = HPDF_New(error_handler,NULL);
+  if (!pdf) {
+    fprintf(stderr,"Call to HPDF_New() failed.\n"); exit(-1); 
+  }
+  HPDF_SetCompressionMode (pdf, HPDF_COMP_ALL);
+  HPDF_SetPageLayout(pdf,HPDF_PAGE_LAYOUT_TWO_COLUMN_LEFT);
+  HPDF_AddPageLabel(pdf, 1, HPDF_PAGE_NUM_STYLE_DECIMAL, 1, "");
+
+  HPDF_UseUTFEncodings(pdf); 
+  HPDF_SetCurrentEncoder(pdf, "UTF-8"); 
+
+  page = HPDF_AddPage(pdf);
+  
+  // Page size in points
+  // XXX - adjust accordingly
+  HPDF_Page_SetWidth(page,72*6);
+  HPDF_Page_SetHeight(page,72*5);
+
+  // How many bars to draw? (and what is peak value?)
+  int timespan_in_hours=0;
+  timestamp cursor=*start;
+  int peak=0;
+  while(ts_notequal(&cursor,end)) {
+    if (years[cursor.year]) {
+      int count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
+      if (count>peak) peak=count;
+    }
+    ts_advance(&cursor); timespan_in_hours++;    
+  }
+
+  float barwidth=(5*72.0)/timespan_in_hours;
+
+  float barscale=(4*72.0)/peak;
+
+  fprintf(stderr,"Drawing barplot spanning %d hours, bardwidth=%f, scale=%f\n",
+	  timespan_in_hours,barwidth,barscale);
+
+  cursor=*start;
+  int barnumber=0;
+  while(ts_notequal(&cursor,end)) {
+    float x = (1*72) + barwidth*barnumber;
+    int count=0;
+    if (years[cursor.year])
+      count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
+    
+    filled_rectange(&page,0.5,0.5,0.5,x,x+barwidth,
+		    (1*72.0),
+		    (1*72.0)+(count*barscale));
+    
+    ts_advance(&cursor);
+    barnumber++;
+  }
+
+  HPDF_SaveToFile(pdf,filename);
+
+  HPDF_Free(pdf);
+  pdf=NULL;
+  
+  return 0;
+}
+
+
 int main(int argc,char **argv)
 {
   if (argc<3) {
@@ -232,23 +317,7 @@ int main(int argc,char **argv)
   fprintf(stderr,"Analysing data from %02d/%02d/%04d to %02d/%02d/%04d\n",
 	  ts.mday,ts.month,ts.year,
 	  end_ts.mday,end_ts.month,end_ts.year);
-  
-  HPDF_Doc pdf;
-
-  HPDF_Page page;
-
-  pdf = HPDF_New(error_handler,NULL);
-  if (!pdf) {
-    fprintf(stderr,"Call to HPDF_New() failed.\n"); exit(-1); 
-  }
-  HPDF_SetCompressionMode (pdf, HPDF_COMP_ALL);
-  HPDF_SetPageLayout(pdf,HPDF_PAGE_LAYOUT_TWO_COLUMN_LEFT);
-  HPDF_AddPageLabel(pdf, 1, HPDF_PAGE_NUM_STYLE_DECIMAL, 1, "");
-
-  HPDF_UseUTFEncodings(pdf); 
-  HPDF_SetCurrentEncoder(pdf, "UTF-8"); 
-
-  
+    
   for(int i=0;i<10000;i++) years[i]=NULL;
   
   unlink("flatbatteryhours_versus_batterylife.csv");
@@ -295,19 +364,24 @@ int main(int argc,char **argv)
     fprintf(f,"time,flat_phones\n");
     int peak=0;
 
-    while(ts_notequal(&ts,&end_ts)) {
-      if (years[ts.year]) {
-	int count=years[ts.year]->counts[ts.month][ts.mday][ts.hour];
+    timestamp cursor=ts;
+    while(ts_notequal(&cursor,&end_ts)) {
+      if (years[cursor.year]) {
+	int count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
 	if (count>peak) peak=count;
 	total+=count;
 	fprintf(f,"%04d-%02d-%02d %02d:00:00,%d\n",
-		ts.year,ts.month,ts.mday,ts.hour,count);	
+		cursor.year,cursor.month,cursor.mday,cursor.hour,count);	
       }
-      ts_advance(&ts);
+      ts_advance(&cursor);
     }
     fclose(f);
 
-    //    draw_pdf_diagram(battery_life_in_minutes/60,pdf,page);    
+    snprintf(filename,1024,"flatbatteries_vs_time_batterlife=%dhours.pdf",
+	     battery_life_in_minutes/60);
+    draw_pdf_barplot_flatbatteries_vs_time(filename,
+					   battery_life_in_minutes/60,
+					   &ts,&end_ts);
     
     f=fopen("flatbatteryhours_versus_batterylife.csv","a");
     if (!battery_life_in_minutes)
