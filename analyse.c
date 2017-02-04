@@ -7,6 +7,72 @@
 #include FT_FREETYPE_H
 #include "hpdf.h"
 
+typedef struct ts {
+  int year;
+  int month;
+  int mday;
+
+  int hour;
+} timestamp;
+
+
+int endofmonth(int mday,int month, int year) {
+
+  
+  if (month<1||month>12) return 1;
+  int days_in_month=31;
+  switch(month) {
+  case 4: case 6: case 9: case 11: days_in_month=30; break;
+  case 2:
+    if (year%4) days_in_month=28; else days_in_month=29;
+    if ((!(year%100))&&(!(year%400))) days_in_month=28;
+  }
+  if (mday>days_in_month) return 1; else return 0;
+}
+
+int ts_set(timestamp *ts,char *s)
+{
+  if (sscanf(s,"%02d/%02d/%04d",&ts->mday,&ts->month,&ts->year)!=3) {
+    fprintf(stderr,"Could not parse date '%s' -- should be DD/MM/YYYY\n",s);
+    exit(-1);
+  }
+  ts->hour=0;
+  return 0;
+}
+
+int ts_notequal(timestamp *a,timestamp *b)
+{
+  if (a->year!=b->year) return 1;
+  if (a->month!=b->month) return 1;
+  if (a->mday!=b->mday) return 1;
+  if (a->hour!=b->hour) return 1;
+  return 0;
+}
+
+int ts_lessthan(timestamp *a,timestamp *b)
+{
+  if (a->year<b->year) return 1;
+  if (a->month<b->month) return 1;
+  if (a->mday<b->mday) return 1;
+  if (a->hour<b->hour) return 1;
+  return 0;
+}
+
+
+int ts_advance(timestamp *t)
+{
+  t->hour++;
+  if (t->hour<24) return 0;
+  t->hour=0;
+  t->mday++;
+  if (endofmonth(t->mday,t->month,t->year)) {
+    t->mday=1;
+    t->month++;
+  }
+  if (t->month>12) { t->month=1; t->year++; }
+  return 0;
+}
+
 void error_handler(HPDF_STATUS error_number, HPDF_STATUS detail_number,
 		   void *data)
 {
@@ -23,20 +89,7 @@ struct year {
 
 struct year *years[10000]={NULL};
 
-
-int endofmonth(int mday,int month, int year) {
-  if (month<1||month>12) return 1;
-  int days_in_month=31;
-  switch(month) {
-  case 4: case 6: case 9: case 11: days_in_month=30; break;
-  case 2:
-    if (year%4) days_in_month=28; else days_in_month=29;
-    if ((!(year%100))&&(!(year%400))) days_in_month=28;
-  }
-  if (mday>days_in_month) return 1; else return 0;
-}
-
-int process_line(char *line)
+int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
 {
   int offset=0;
   int commas=5;
@@ -48,20 +101,26 @@ int process_line(char *line)
   }
 
   int duration;
-  int start_mday, start_month, start_year, start_hour, start_min;
-  int end_mday, end_month, end_year, end_hour, end_min;
+  timestamp start;  int start_min;
+  timestamp end; int end_min;
   int customers;
   
   // Parse something like "165,1/01/06 13:45,1/01/06 16:30,1"
   // of format INT_DURATION,FIRST_CUSTOMER_OFF_DATETIME,LAST_CUSTOMER_ON_DATETIME,CUSTOMERS_INT
   if (sscanf(&line[offset],"%d,%d/%d/%d %d:%d,%d/%d/%d %d:%d,%d",
 	     &duration,
-	     &start_mday,&start_month,&start_year,&start_hour,&start_min,
-	     &end_mday,&end_month,&end_year,&end_hour,&end_min,
+	     &start.mday,&start.month,&start.year,&start.hour,&start_min,
+	     &end.mday,&end.month,&end.year,&end.hour,&end_min,
 	     &customers)==12) {
 
-    if (start_year<100) start_year+=2000;
-    if (end_year<100) end_year+=2000;
+    if (start.year<100) start.year+=2000;
+    if (end.year<100) end.year+=2000;
+
+    // Ignore out of range dates
+    if (ts_lessthan(&start,start_epoch)&&ts_lessthan(&end,end_epoch))
+      return 0;
+    if (ts_lessthan(end_epoch,&end)&&ts_lessthan(end_epoch,&end))
+      return 0;
     
     /* Our algorithm is simple:
 
@@ -82,24 +141,24 @@ int process_line(char *line)
     float initial_charge_level=0;
 
     // midnight to 8am = full
-    if (start_hour<8) initial_charge_level=100.0;
+    if (start.hour<8) initial_charge_level=100.0;
     // 8am to 10pm = discharging
     float minutely_discharge = 100.0 / battery_life_in_minutes;
     float daily_discharge= (22 - 8) * 60.0 * minutely_discharge;
-    if ((start_hour>=8)&&(start_hour<22))
-      initial_charge_level=100.0 - minutely_discharge * ( (start_hour-8) * 60 + start_min );
+    if ((start.hour>=8)&&(start.hour<22))
+      initial_charge_level=100.0 - minutely_discharge * ( (start.hour-8) * 60 + start_min );
     if (initial_charge_level<0) initial_charge_level=0;
     
     // 10pm to midnight = charging
-    if (start_hour>=22) {
+    if (start.hour>=22) {
       initial_charge_level=100.0 - daily_discharge;
       if (initial_charge_level<0) initial_charge_level=0;
-      initial_charge_level += ( ( (start_hour-22) * 60 + start_min ) / 120.0 ) * 100.0;
+      initial_charge_level += ( ( (start.hour-22) * 60 + start_min ) / 120.0 ) * 100.0;
     }
     if (initial_charge_level>100) initial_charge_level=100;
 
     if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
-		  initial_charge_level,start_hour,start_min);
+		  initial_charge_level,start.hour,start_min);
 
     while (duration>0) {
       if (initial_charge_level <= 0 ) {
@@ -107,10 +166,10 @@ int process_line(char *line)
 	if (0)
 	  printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
 	       customers,
-	       start_mday,start_month,start_year,
-	       start_hour,start_min,
-	       end_mday,end_month,end_year,
-	       end_hour,end_min,
+	       start.mday,start.month,start.year,
+	       start.hour,start_min,
+	       end.mday,end.month,end.year,
+	       end.hour,end_min,
 	       duration
 	       );
 
@@ -118,52 +177,32 @@ int process_line(char *line)
 	while(duration>0) {
 	  if (0)
 	    printf("    still flat at %d/%d/%d %02d:00\n",
-		   start_mday,start_month,start_year,
-		   start_hour);
+		   start.mday,start.month,start.year,
+		   start.hour);
 	  
-	  if (!years[start_year]) {
-	    years[start_year]=calloc(1,sizeof(struct year));
-	    if (!years[start_year]) {
+	  if (!years[start.year]) {
+	    years[start.year]=calloc(1,sizeof(struct year));
+	    if (!years[start.year]) {
 	      perror("calloc"); exit(-1);
 	    }
 	  }
-	  years[start_year]->counts[start_month][start_mday][start_hour]+=customers;
+	  years[start.year]->counts[start.month][start.mday][start.hour]+=customers;
 
 	  // Now advance an hour
-	  start_hour++;
-	  if (start_hour>=24) {
-	    start_hour=0; start_mday++;
-	    if (endofmonth(start_mday,start_month,start_year)) {
-	      start_mday=1; start_month++;
-	      if (start_month>12) {
-		start_month=1; start_year++;
-	      }
-	    }
-	  }
+	  ts_advance(&start);
 	  
 	  duration-=60;
 	}
 	
 	break;
       } else {
-	if (start_year<100) start_year+=2000;
-	if (end_year<100) end_year+=2000;
 	initial_charge_level -= minutely_discharge;
 	duration--;
 	start_min++;
 	if (start_min>=60) {
-	  start_min=0; start_hour++;
-	  if (start_hour>=24) {
-	    start_hour=0; start_mday++;
-	    if (endofmonth(start_mday,start_month,start_year)) {
-	      start_mday=1; start_month++;
-	      if (start_month>12) {
-		start_month=1; start_year++;
-	      }
-	    }
-	  }
-	}
-	  
+	  start_min=0;
+	  ts_advance(&start);
+	}	  
       }
     }
   }
@@ -173,11 +212,27 @@ int process_line(char *line)
 
 int main(int argc,char **argv)
 {
-  if (argc!=3) {
-    fprintf(stderr,"usage: analyse <battery life in hours> <data file>\n");
+  if (argc<3) {
+    fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date]\n");
     exit(-1);
   }
 
+  char *start_epoch="01/01/2005";
+  char *end_epoch="31/12/2016";
+
+  if (argc>3) start_epoch=argv[3];
+  if (argc>4) end_epoch=argv[4];
+
+  timestamp ts;
+  ts_set(&ts,start_epoch);
+  timestamp end_ts;
+  ts_set(&end_ts,end_epoch);
+  end_ts.hour=23;
+
+  fprintf(stderr,"Analysing data from %02d/%02d/%04d to %02d/%02d/%04d\n",
+	  ts.mday,ts.month,ts.year,
+	  end_ts.mday,end_ts.month,end_ts.year);
+  
   HPDF_Doc pdf;
 
   HPDF_Page page;
@@ -220,11 +275,12 @@ int main(int argc,char **argv)
 	line[line_len++]=c;
 	line[line_len]=0;
       } else {    
-	process_line(line);
+	process_line(line,&ts,&end_ts);
 	line_len=0;
       }
     }
-    if (line_len) process_line(line);
+    if (line_len) process_line(line,&ts,&end_ts);
+
     fclose(f);
     
     long long total=0;
@@ -237,54 +293,21 @@ int main(int argc,char **argv)
     
     // Write hourly impact histogram
     fprintf(f,"time,flat_phones\n");
-    int previous_count=0;
-    int climbing=0;
-    int steady=0;
-    int inevent=0;
     int peak=0;
-    for(int y=0;y<10000;y++)
-      if (years[y]) {
-	for(int month=1;month<12;month++) {
-	  for(int mday=1;mday<31;mday++) {
-	    for(int hour=0;hour<24;hour++) {
-	      int count=years[y]->counts[month][mday][hour];
 
-	      if ((count-previous_count)>1000) {
-		climbing++;
-	      } else climbing=0;
-	      if (((count-previous_count)<100)&&
-		  ((count-previous_count)>-100)) steady++; else steady=0;
-	      
-	      if (climbing==2&&(!inevent)) {
-		printf("Major event on %04d-%02d-%02d %02d:00 (count=%d)\n",
-		       y,month,mday,hour,count);
-		peak=count;
-		inevent++;
-	      }
-	      if ((count<(peak/10))||(count<1000)) {
-		if (inevent>0) {
-		  printf("  event appears to end on %04d-%02d-%02d %02d:00 (count=%d, peak=%d)\n",
-			 y,month,mday,hour,count,peak);
-
-		  inevent--;
-		}
-	      } else if (inevent) if (count>peak) peak=count;
-	      previous_count=count;
-	      
-	      total+=count;
-	      //	    if (count>0)
-	      {
-		fprintf(f,"%04d-%02d-%02d %02d:00:00,%d\n",y,month,mday,hour,count);
-	      }
-	    }
-	  }
-	}
+    while(ts_notequal(&ts,&end_ts)) {
+      if (years[ts.year]) {
+	int count=years[ts.year]->counts[ts.month][ts.mday][ts.hour];
+	if (count>peak) peak=count;
+	total+=count;
+	fprintf(f,"%04d-%02d-%02d %02d:00:00,%d\n",
+		ts.year,ts.month,ts.mday,ts.hour,count);	
       }
+      ts_advance(&ts);
+    }
     fclose(f);
 
-    //    draw_pdf_diagram(battery_life_in_minutes/60,pdf,page);
-    
-    
+    //    draw_pdf_diagram(battery_life_in_minutes/60,pdf,page);    
     
     f=fopen("flatbatteryhours_versus_batterylife.csv","a");
     if (!battery_life_in_minutes)
