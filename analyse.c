@@ -216,10 +216,10 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
 
 int filled_rectange(HPDF_Page *page,
 		    float r,float g,float b,
-		    float x1,float y1, float x2, float y2)
+		    float x1,float y1, float w, float h)
 {
   HPDF_Page_SetRGBFill (*page, r,g,b);
-  HPDF_Page_Rectangle(*page, x1,y1,x2,y2);
+  HPDF_Page_Rectangle(*page, x1,y1,w,h);
   HPDF_Page_Fill(*page);
   return 0;
 }
@@ -287,8 +287,8 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     float height=count*barscale;
     
     filled_rectange(&page,0.5,0.5,0.5,
-		    x,barwidth,
-		    y_bottom,height);
+		    x,y_bottom,
+		    barwidth,height);
     
     ts_advance(&cursor);
     barnumber++;
