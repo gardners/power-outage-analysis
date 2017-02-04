@@ -218,7 +218,6 @@ int filled_rectange(HPDF_Page *page,
 		    float r,float g,float b,
 		    float x1,float y1, float w, float h)
 {
-
   HPDF_Page_SetLineWidth(*page,0);
   HPDF_Page_SetLineCap(*page,HPDF_BUTT_END);
   HPDF_Page_SetLineJoin(*page,HPDF_MITER_JOIN);
@@ -229,6 +228,23 @@ int filled_rectange(HPDF_Page *page,
   HPDF_Page_Rectangle(*page, x1,y1,w,h);
   HPDF_Page_FillStroke(*page);
   
+  return 0;
+}
+
+int line(HPDF_Page *page,
+	 float r,float g,float b, float width,
+	 float x1,float y1, float x2,float y2)
+{
+  HPDF_Page_SetLineWidth(*page,width);
+  HPDF_Page_SetLineCap(*page,HPDF_BUTT_END);
+  HPDF_Page_SetLineJoin(*page,HPDF_MITER_JOIN);
+  HPDF_Page_SetDash(*page,NULL,0,0);
+  
+  HPDF_Page_SetRGBFill (*page, r,g,b);
+  HPDF_Page_SetRGBStroke (*page, r,g,b);
+  HPDF_Page_MoveTo(*page, x1,y1);
+  HPDF_Page_LineTo(*page, x2,y2);
+  HPDF_Page_Stroke(*page);
   return 0;
 }
 
@@ -245,6 +261,8 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   float fig_height=5*72;
   float x_left=0.75*72;
   float y_bottom=0.75*72;
+  float x_right=0.25*72;
+  float y_top=0.25*72;
 
   
   pdf = HPDF_New(error_handler,NULL);
@@ -276,10 +294,10 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     }
     ts_advance(&cursor); timespan_in_hours++;    
   }
+  
+  float barwidth=(fig_width-x_left-x_right)/timespan_in_hours;
 
-  float barwidth=(fig_width-x_left-0.25*72)/timespan_in_hours;
-
-  float barscale=(fig_height-y_bottom-0.25*72)/peak;
+  float barscale=(fig_height-y_bottom-y_top)/peak;
 
   fprintf(stderr,"Drawing barplot spanning %d hours, bardwidth=%f, scale=%f\n",
 	  timespan_in_hours,barwidth,barscale);
@@ -302,6 +320,12 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     barnumber++;
   }
 
+  // Draw furniture
+
+  line(&page,0,0,0,1,x_left,y_bottom,fig_width-x_right+(x_right/2),y_bottom);
+  line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top+(x_right/2));
+
+  
   HPDF_SaveToFile(pdf,filename);
 
   HPDF_Free(pdf);
