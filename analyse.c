@@ -227,7 +227,8 @@ int filled_rectange(HPDF_Page *page,
   HPDF_Page_SetRGBFill (*page, r,g,b);
   HPDF_Page_SetRGBStroke (*page, r,g,b);
   HPDF_Page_Rectangle(*page, x1,y1,w,h);
-  HPDF_Page_Fill(*page);
+  HPDF_Page_FillStroke(*page);
+  
   return 0;
 }
 
