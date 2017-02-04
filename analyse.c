@@ -260,9 +260,11 @@ HPDF_Font font_helvetica=NULL;
 int draw_text(HPDF_Page *page,
 	      char *text, float size,
 	      float r, float g, float b,
-	      float x, float y, float radians,
+	      float x, float y, float angle_degrees,
 	      int halign, int valign)
 {
+  float radians = angle_degrees / 180 * 3.141592;
+  
   HPDF_Page_SetFontAndSize (*page, font_helvetica, size);
 
   float text_width=HPDF_Page_TextWidth(*page,text);
@@ -379,8 +381,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
   // Y-axis scale ticks
   // 0 and maximum range:
-  y_tick(&page,0,barscale);
-  y_tick(&page,peak,barscale);
+  for (int n=0;n<=5;n++) y_tick(&page,peak*n/5,barscale);
   // Some round numbers in between	
 
   
