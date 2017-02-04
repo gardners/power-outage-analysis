@@ -218,7 +218,14 @@ int filled_rectange(HPDF_Page *page,
 		    float r,float g,float b,
 		    float x1,float y1, float w, float h)
 {
+
+  HPDF_Page_SetLineWidth(*page,0);
+  HPDF_Page_SetLineCap(*page,HPDF_BUTT_END);
+  HPDF_Page_SetLineJoin(*page,HPDF_MITER_JOIN);
+  HPDF_Page_SetDash(*page,NULL,0,0);
+  
   HPDF_Page_SetRGBFill (*page, r,g,b);
+  HPDF_Page_SetRGBStroke (*page, r,g,b);
   HPDF_Page_Rectangle(*page, x1,y1,w,h);
   HPDF_Page_Fill(*page);
   return 0;
@@ -275,9 +282,9 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
   fprintf(stderr,"Drawing barplot spanning %d hours, bardwidth=%f, scale=%f\n",
 	  timespan_in_hours,barwidth,barscale);
-
+  
   cursor=*start;
-  int barnumber=0;
+  int barnumber=0;  
   while(ts_notequal(&cursor,end)) {
     float x = x_left + barwidth*barnumber;
     int count=0;
