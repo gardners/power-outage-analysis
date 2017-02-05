@@ -442,8 +442,14 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   
   float barwidth=(fig_width-x_left-x_right)/timespan_in_hours;
 
-  float barscale=(fig_height-y_bottom-y_top)/peak;
+  // Allow 24 points of vertical space for each time event.
+  int event_count=0;
+  if (events) for(int e=0;events[e];e++) event_count++;
+  int event_y_space=12*2*event_count;
 
+  float barscale=(fig_height-y_bottom-y_top-event_y_space)/peak;
+
+  
   fprintf(stderr,"Drawing barplot spanning %d hours, bardwidth=%f, scale=%f\n",
 	  timespan_in_hours,barwidth,barscale);
   
@@ -469,7 +475,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
   // Axis lines
   line(&page,0,0,0,1,x_left,y_bottom,fig_width-x_right+4.5,y_bottom);
-  line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top+4.5);
+  line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top-event_y_space+4.5);
 
   // Y-axis scale ticks
   for (int n=0;n<=8;n++) y_tick(&page,n*peak/8,barscale);
