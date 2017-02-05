@@ -253,7 +253,7 @@ float fig_width=6*72;
 float fig_height=5*72;
 float x_left=0.75*72;
 float y_bottom=0.75*72;
-float x_right=0.25*72;
+float x_right=0.50*72;
 float y_top=0.25*72;
 HPDF_Font font_helvetica=NULL;
 
@@ -292,12 +292,15 @@ int draw_text(HPDF_Page *page,
 
 int y_tick(HPDF_Page *page,int value,float barscale)
 {
-  line(page,0,0,0,1,
-       x_left-4.5,y_bottom+(value*barscale),
-       x_left,y_bottom+(value*barscale));
-
   char value_string[1024];
   snprintf(value_string,1024,"%d",value);
+
+  float v=value;
+  
+  line(page,0,0,0,1,
+       x_left-4.5,y_bottom+(v*barscale),
+       x_left,y_bottom+(v*barscale));    
+  
   draw_text(page,
 	    value_string,10,
 	    0,0,0,	   
@@ -374,6 +377,10 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     }
     ts_advance(&cursor); timespan_in_hours++;    
   }
+
+  //  int temp=peak;
+  //peak=1;
+  // while(peak<temp) peak=peak<<1;  
   
   float barwidth=(fig_width-x_left-x_right)/timespan_in_hours;
 
@@ -407,7 +414,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   line(&page,0,0,0,1,x_left,y_bottom,x_left,fig_height-y_top+4.5);
 
   // Y-axis scale ticks
-  for (int n=0;n<=5;n++) y_tick(&page,peak*n/5,barscale);
+  for (int n=0;n<=8;n++) y_tick(&page,n*peak/8,barscale);
 
   for (int n=0;n<=5;n++) {
     char label1[1024], label2[1024];
