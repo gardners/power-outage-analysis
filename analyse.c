@@ -16,6 +16,7 @@ typedef struct ts {
   int hour;
 } timestamp;
 
+const HPDF_UINT16 DASH_MODE1[] = {3};
 
 int endofmonth(int mday,int month, int year) {
 
@@ -249,6 +250,23 @@ int line(HPDF_Page *page,
   return 0;
 }
 
+int dashed_line(HPDF_Page *page,
+		float r,float g,float b, float width,
+		float x1,float y1, float x2,float y2)
+{
+  HPDF_Page_SetLineWidth(*page,width);
+  HPDF_Page_SetLineCap(*page,HPDF_BUTT_END);
+  HPDF_Page_SetLineJoin(*page,HPDF_MITER_JOIN);
+  HPDF_Page_SetDash(*page, DASH_MODE1, 1, 1);
+  
+  HPDF_Page_SetRGBFill (*page, r,g,b);
+  HPDF_Page_SetRGBStroke (*page, r,g,b);
+  HPDF_Page_MoveTo(*page, x1,y1);
+  HPDF_Page_LineTo(*page, x2,y2);
+  HPDF_Page_Stroke(*page);
+  return 0;
+}
+
 float fig_width=6*72;
 float fig_height=5*72;
 float x_left=0.75*72;
@@ -338,9 +356,49 @@ int x_tick(HPDF_Page *page,char *text1, char *text2,
   return 0;
 }
 
+int draw_event(HPDF_Page *page,char *text,timestamp event_ts,
+	       timestamp *start,timestamp *end,
+	       float barwidth,int number)
+{
+  int barnumber=0;
+  timestamp t=*start;
+  while(ts_notequal(&t,&event_ts)) {
+    barnumber++;
+    ts_advance(&t);
+  }
+
+  dashed_line(page,0,0,0,1,
+	      x_left+barnumber*barwidth,y_bottom,
+	      x_left+barnumber*barwidth,
+	      (fig_height-y_top)-number*(2*12)
+	      );
+  draw_text(page,
+	    text,10,
+	    0,0,0,	   
+	    x_left+barnumber*barwidth+3,
+	    (fig_height-y_top)-number*(2*12),
+	    0,
+	    -1,+1);
+  char timelabel[1024];
+  snprintf(timelabel,1024,"%04d/%02d/%02d %02d:%02d",
+	   event_ts.year,event_ts.month,event_ts.mday,
+	   event_ts.hour,0);
+  draw_text(page,
+	    timelabel,10,
+	    0,0,0,	   
+	    x_left+barnumber*barwidth+3,
+	    (fig_height-y_top)-number*(2*12)-12,
+	    0,
+	    -1,+1);
+
+  
+  return 0;
+}
+
 int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 					   int battery_life_in_hours,
-					   timestamp *start,timestamp *end)
+					   timestamp *start,timestamp *end,
+					   char *events[])
 {
   HPDF_Doc pdf;
 
@@ -426,6 +484,40 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     x_tick(&page,label1,label2,timespan_in_hours*n/5,barwidth,0);
   }
 
+  // Axis labels
+  draw_text(&page,
+	    "Number of phones with flat batteries according to model",10,
+	    0,0,0,
+	    // XXX - Why can't we calculate this relative to figure size etc
+	    // and have it end up in the right place?
+	    // 10,y_bottom+(fig_height-y_top-y_bottom)/2,90,
+	    10,y_bottom+25,90,
+	    -1,0);
+  draw_text(&page,
+	    "Point in time (hourly resolution)",10,
+	    0,0,0,
+	    // XXX - Why can't we calculate this relative to figure size etc
+	    // and have it end up in the right place?
+	    // 10,y_bottom+(fig_height-y_top-y_bottom)/2,90,
+	    x_left+(fig_width-x_left-x_right)/2,10,0,
+	    0,0);
+
+  // Draw events
+  if (events) {
+    for(int e=0;events[e];e++) {
+      char event_name[1024];
+      timestamp event_ts;
+      if (sscanf(events[e],"%02d/%02d/%04d %02d:%*d=%[^\n]",
+		 &event_ts.mday,&event_ts.month,&event_ts.year,
+		 &event_ts.hour,event_name)==5) {
+	// Draw dashed line, time stamp and event description
+	draw_event(&page,event_name,event_ts,
+		   start,end,
+		   barwidth,e);
+      }
+    }
+  }
+
   
   HPDF_SaveToFile(pdf,filename);
 
@@ -449,6 +541,14 @@ int main(int argc,char **argv)
   if (argc>3) start_epoch=argv[3];
   if (argc>4) end_epoch=argv[4];
 
+  char *events[1024];
+  int event_count=0;
+  for(int e=5;e<argc;e++) {
+    events[event_count++]=argv[e];
+  }
+  events[event_count]=NULL;
+  
+  
   timestamp ts;
   ts_set(&ts,start_epoch);
   timestamp end_ts;
@@ -522,7 +622,8 @@ int main(int argc,char **argv)
 	     battery_life_in_minutes/60);
     draw_pdf_barplot_flatbatteries_vs_time(filename,
 					   battery_life_in_minutes/60,
-					   &ts,&end_ts);
+					   &ts,&end_ts,
+					   events);
     
     f=fopen("flatbatteryhours_versus_batterylife.csv","a");
     if (!battery_life_in_minutes)
