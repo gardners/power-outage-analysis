@@ -308,7 +308,8 @@ int y_tick(HPDF_Page *page,int value,float barscale)
   return 0;
 }
 
-int x_tick(HPDF_Page *page,char *text,int value,float barwidth, int phase)
+int x_tick(HPDF_Page *page,char *text1, char *text2,
+	   int value,float barwidth, int phase)
 {
   line(page,0,0,0,1,
        x_left+value*barwidth,y_bottom,
@@ -318,9 +319,16 @@ int x_tick(HPDF_Page *page,char *text,int value,float barwidth, int phase)
   if (phase&1) offset+=12;
   
   draw_text(page,
-	    text,10,
+	    text1,10,
 	    0,0,0,	   
 	    x_left+value*barwidth,y_bottom-6.0-3.0-offset,
+	    0,
+	    0,+1);
+  draw_text(page,
+	    text2,10,
+	    0,0,0,	   
+	    x_left+value*barwidth,y_bottom-6.0-3.0-offset
+	    -11, // font inter-line height
 	    0,
 	    0,+1);
   
@@ -402,12 +410,13 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   for (int n=0;n<=5;n++) y_tick(&page,peak*n/5,barscale);
 
   for (int n=0;n<=5;n++) {
-    char label[1024];
+    char label1[1024], label2[1024];
     timestamp c2 = *start;
     for (int j=0;j<timespan_in_hours*n/5;j++) ts_advance(&c2);
-    snprintf(label,1024,"%04d/%02d/%02d %02d:00",
-	     c2.year,c2.month,c2.mday,c2.hour);
-    x_tick(&page,label,timespan_in_hours*n/5,barwidth,n);
+    snprintf(label1,1024,"%04d/%02d/%02d",
+	     c2.year,c2.month,c2.mday);
+    snprintf(label2,1024,"%02d:00",c2.hour);
+    x_tick(&page,label1,label2,timespan_in_hours*n/5,barwidth,0);
   }
 
   
