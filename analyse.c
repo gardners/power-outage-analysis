@@ -58,8 +58,11 @@ int ts_notequal(timestamp *a,timestamp *b)
 int ts_lessthan(timestamp *a,timestamp *b)
 {
   if (a->year<b->year) return 1;
+  if (a->year>b->year) return 0;
   if (a->month<b->month) return 1;
+  if (a->month>b->month) return 0;
   if (a->mday<b->mday) return 1;
+  if (a->mday>b->mday) return 0;
   if (a->hour<b->hour) return 1;
   return 0;
 }
@@ -123,10 +126,25 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
     if (end.year<100) end.year+=2000;
 
     // Ignore out of range dates
-    if (ts_lessthan(&start,start_epoch)&&ts_lessthan(&end,end_epoch))
-      return 0;
-    if (ts_lessthan(end_epoch,&end)&&ts_lessthan(end_epoch,&end))
-      return 0;
+    int ignore=0;
+    if (ts_lessthan(&end,start_epoch)) ignore=1;
+    if (ts_lessthan(end_epoch,&start)) ignore=2;
+
+    if (0)
+      printf("%04d/%02d/%02d %02d:00 -- %04d/%02d/%02d %02d:00 is in %sscope (%d) "
+	     "%04d/%02d/%02d %02d:00 -- %04d/%02d/%02d %02d:00"
+	     ".\n",
+	     start.year,start.month,start.mday,start.hour,
+	     end.year,end.month,end.mday,end.hour,
+	     
+	     ignore?"not ":"",ignore,
+	     
+	     start_epoch->year,start_epoch->month,start_epoch->mday,start_epoch->hour,
+	     end_epoch->year,end_epoch->month,end_epoch->mday,end_epoch->hour
+	     );
+    
+
+    if (ignore) return 0;
     
     /* Our algorithm is simple:
 
@@ -462,6 +480,11 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
       count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
 
     float height=count*barscale;
+
+    if (0)
+      printf("Plotting %04d/%02d/%02d %02d:00 (%d) as %f pixels high\n",
+	     cursor.year,cursor.month,cursor.mday,cursor.hour,
+	     count,height);
     
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
