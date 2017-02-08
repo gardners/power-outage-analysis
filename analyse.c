@@ -16,6 +16,8 @@ typedef struct ts {
   int hour;
 } timestamp;
 
+int fixed_peak=0;
+
 const HPDF_UINT16 DASH_MODE1[] = {3};
 
 int endofmonth(int mday,int month, int year) {
@@ -459,6 +461,9 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     ts_advance(&cursor); timespan_in_hours++;    
   }
 
+  if (fixed_peak) peak=fixed_peak;
+
+  
   //  int temp=peak;
   //peak=1;
   // while(peak<temp) peak=peak<<1;  
@@ -567,7 +572,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 int main(int argc,char **argv)
 {
   if (argc<3) {
-    fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date]\n");
+    fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date] [time=event ...] [maxy=<maximum y value>]\n");
     exit(-1);
   }
 
@@ -577,10 +582,14 @@ int main(int argc,char **argv)
   if (argc>3) start_epoch=argv[3];
   if (argc>4) end_epoch=argv[4];
 
+  // Parse time points, and also allow setting of peak y value
   char *events[1024];
   int event_count=0;
   for(int e=5;e<argc;e++) {
-    events[event_count++]=argv[e];
+    if (sscanf(argv[e],"maxy=%d",&fixed_peak)!=1)
+      events[event_count++]=argv[e];
+    else
+      fprintf(stderr,"Setting Y maximum value to %d\n",fixed_peak);
   }
   events[event_count]=NULL;
   
