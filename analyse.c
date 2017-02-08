@@ -8,6 +8,9 @@
 #include FT_FREETYPE_H
 #include "hpdf.h"
 
+//#define DEBUG_DATE (start.year==2009&&start.month==1&&start.mday==22)
+#define DEBUG_DATE 0
+
 typedef struct ts {
   int year;
   int month;
@@ -132,7 +135,9 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
     if (ts_lessthan(&end,start_epoch)) ignore=1;
     if (ts_lessthan(end_epoch,&start)) ignore=2;
 
-    if (0)
+    if (DEBUG_DATE)
+      {
+      fflush(stderr);
       printf("%04d/%02d/%02d %02d:00 -- %04d/%02d/%02d %02d:00 is in %sscope (%d) "
 	     "%04d/%02d/%02d %02d:00 -- %04d/%02d/%02d %02d:00"
 	     ".\n",
@@ -144,6 +149,9 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
 	     start_epoch->year,start_epoch->month,start_epoch->mday,start_epoch->hour,
 	     end_epoch->year,end_epoch->month,end_epoch->mday,end_epoch->hour
 	     );
+      printf("  [%s]\n",line);
+      fflush(stdout);
+    }
     
 
     if (ignore) return 0;
@@ -188,28 +196,41 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
       daily_discharge=100;
     }
     
-    if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
-		  initial_charge_level,start.hour,start_min);
+    if (DEBUG_DATE) {
+      fflush(stderr);
+      printf("Charge level = %0.3f @ %02d:%02d\n",
+	     initial_charge_level,start.hour,start_min);
+      fflush(stdout);
+    }
 
     while (duration>0) {
       if (initial_charge_level <= 0 ) {
 	// Mark effect of outage
-	if (0)
+	if (DEBUG_DATE) {
+	  fflush(stderr);
 	  printf("  %d phone(s) went flat at %d/%d/%d %02d:%02d until %d/%d/%04d %02d:%02d  (%d minutes)\n",
-	       customers,
-	       start.mday,start.month,start.year,
-	       start.hour,start_min,
-	       end.mday,end.month,end.year,
-	       end.hour,end_min,
-	       duration
-	       );
+		 customers,
+		 start.mday,start.month,start.year,
+		 start.hour,start_min,
+		 end.mday,end.month,end.year,
+		 end.hour,end_min,
+		 duration
+		 );
+	  fflush(stdout);
+	}
 
+	// Add minutes field to make sure we cross hours when appropriate
+	duration+=start_min;
+	
 	// Now mark the hourly bins to record the outage
 	while(duration>0) {
-	  if (0)
-	    printf("    still flat at %d/%d/%d %02d:00\n",
+	  if (DEBUG_DATE) {
+	    fflush(stderr);
+	    printf("    still flat at %d/%d/%d %02d:00 (remaining duration = %d minutes)\n",
 		   start.mday,start.month,start.year,
-		   start.hour);
+		   start.hour,duration);
+	    fflush(stdout);
+	  }
 	  
 	  if (!years[start.year]) {
 	    years[start.year]=calloc(1,sizeof(struct year));
@@ -219,6 +240,15 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
 	  }
 	  years[start.year]->counts[start.month][start.mday][start.hour]+=customers;
 
+	  if (DEBUG_DATE&&start.hour==18) {
+	    fflush(stdout);
+	    fprintf(stderr,"      Added %d customers to 2009/01/22 18:00, now = %d\n",
+		    customers,
+		    years[start.year]->counts[start.month][start.mday][start.hour]
+		    );
+	    fflush(stderr);
+	  }
+	  
 	  // Now advance an hour
 	  ts_advance(&start);
 	  
@@ -500,7 +530,10 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
 		    barwidth,height);
-    if (count>max_count) max_count=count;
+    
+    if (count>max_count) {
+      max_count=count;
+    }
     
     ts_advance(&cursor);
     barnumber++;
