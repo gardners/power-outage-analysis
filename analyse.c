@@ -18,6 +18,7 @@ typedef struct ts {
 } timestamp;
 
 // only needed to generate plot PDFs
+int fixed_peak=0;
 const HPDF_UINT16 DASH_MODE1[] = {3};
 
 int endofmonth(int mday,int month, int year) {
@@ -188,6 +189,11 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
     }
     if (initial_charge_level>100) initial_charge_level=100;
 
+    if (!battery_life_in_minutes) {
+      initial_charge_level=0;
+      daily_discharge=100;
+    }
+    
     if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
 		  initial_charge_level,start.hour,start_min);
 
@@ -470,6 +476,9 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     ts_advance(&cursor); timespan_in_hours++;    
   }
 
+  if (fixed_peak) peak=fixed_peak;
+
+  
   //  int temp=peak;
   //peak=1;
   // while(peak<temp) peak=peak<<1;  
@@ -488,7 +497,8 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 	  timespan_in_hours,barwidth,barscale);
   
   cursor=*start;
-  int barnumber=0;  
+  int barnumber=0;
+  int max_count=0;
   while(ts_notequal(&cursor,end)) {
     float x = x_left + barwidth*barnumber;
     int count=0;
@@ -505,11 +515,16 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
 		    barwidth,height);
+    if (count>max_count) max_count=count;
     
     ts_advance(&cursor);
     barnumber++;
   }
 
+  fprintf(stderr,"Maximum simultaneous without power = %d for %d hour battery life.\n",
+	  max_count,battery_life_in_hours);
+
+  
   // Draw furniture
 
   // Axis lines
@@ -579,7 +594,7 @@ int main(int argc,char **argv)
 {
   // check input arguments
   if (argc<3) {
-    fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date]\n");
+    fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date] [time=event ...] [maxy=<maximum y value>]\n");
     exit(-1);
   }
 
@@ -591,12 +606,14 @@ int main(int argc,char **argv)
   if (argc>3) start_epoch=argv[3];
   if (argc>4) end_epoch=argv[4];
 
-  // create array of pointers to chars
-  // BG: undocumented feature here, seems the events[] array can be initially populated using CLI input argc
+  // Parse time points, and also allow setting of peak y value
   char *events[1024];
   int event_count=0;
   for(int e=5;e<argc;e++) {
-    events[event_count++]=argv[e];
+    if (sscanf(argv[e],"maxy=%d",&fixed_peak)!=1)
+      events[event_count++]=argv[e];
+    else
+      fprintf(stderr,"Setting Y maximum value to %d\n",fixed_peak);
   }
   events[event_count]=NULL;
   
