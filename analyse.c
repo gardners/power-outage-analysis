@@ -482,7 +482,8 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 	  timespan_in_hours,barwidth,barscale);
   
   cursor=*start;
-  int barnumber=0;  
+  int barnumber=0;
+  int max_count=0;
   while(ts_notequal(&cursor,end)) {
     float x = x_left + barwidth*barnumber;
     int count=0;
@@ -499,11 +500,16 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
 		    barwidth,height);
+    if (count>max_count) max_count=count;
     
     ts_advance(&cursor);
     barnumber++;
   }
 
+  fprintf(stderr,"Maximum simultaneous without power = %d for %d hour battery life.\n",
+	  max_count,battery_life_in_hours);
+
+  
   // Draw furniture
 
   // Axis lines
