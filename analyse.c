@@ -514,8 +514,10 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
   }
 
   // Axis labels
+  char *ylabel="Number of phones with flat batteries according to model";
+  if (!battery_life_in_hours) ylabel="Number of customers without electricity supply";
   draw_text(&page,
-	    "Number of phones with flat batteries according to model",10,
+	    ylabel,10,
 	    0,0,0,
 	    // XXX - Why can't we calculate this relative to figure size etc
 	    // and have it end up in the right place?
