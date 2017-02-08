@@ -181,6 +181,11 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
     }
     if (initial_charge_level>100) initial_charge_level=100;
 
+    if (!battery_life_in_minutes) {
+      initial_charge_level=0;
+      daily_discharge=100;
+    }
+    
     if (0) printf("Charge level = %0.3f @ %02d:%02d\n",
 		  initial_charge_level,start.hour,start_min);
 
@@ -485,7 +490,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
       printf("Plotting %04d/%02d/%02d %02d:00 (%d) as %f pixels high\n",
 	     cursor.year,cursor.month,cursor.mday,cursor.hour,
 	     count,height);
-    
+1    
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
 		    barwidth,height);
