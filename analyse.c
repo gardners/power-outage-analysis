@@ -490,7 +490,7 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
       printf("Plotting %04d/%02d/%02d %02d:00 (%d) as %f pixels high\n",
 	     cursor.year,cursor.month,cursor.mday,cursor.hour,
 	     count,height);
-1    
+    
     filled_rectange(&page,0.5,0.5,0.5,
 		    x,y_bottom,
 		    barwidth,height);
