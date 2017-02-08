@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <math.h>
 
+// only needed to generate plot PDFs
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "hpdf.h"
@@ -16,6 +17,7 @@ typedef struct ts {
   int hour;
 } timestamp;
 
+// only needed to generate plot PDFs
 const HPDF_UINT16 DASH_MODE1[] = {3};
 
 int endofmonth(int mday,int month, int year) {
@@ -82,6 +84,7 @@ int ts_advance(timestamp *t)
   return 0;
 }
 
+// only needed to generate plot PDFs
 void error_handler(HPDF_STATUS error_number, HPDF_STATUS detail_number,
 		   void *data)
 {
@@ -90,12 +93,16 @@ void error_handler(HPDF_STATUS error_number, HPDF_STATUS detail_number,
   exit(-1);
 }
 
+// make some GLOBAL variables, so they can be used in any function
+
 int battery_life_in_minutes=0;
 
+// three-dimensional array of integers
 struct year {
   int counts[13][32][24];
 };
 
+// 10,000 of the above 3D arrays
 struct year *years[10000]={NULL};
 
 int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
@@ -234,6 +241,7 @@ int process_line(char *line,timestamp *start_epoch,timestamp *end_epoch)
   return 0;
 }
 
+// only needed to generate plot PDFs
 int filled_rectange(HPDF_Page *page,
 		    float r,float g,float b,
 		    float x1,float y1, float w, float h)
@@ -251,6 +259,7 @@ int filled_rectange(HPDF_Page *page,
   return 0;
 }
 
+// only needed to generate plot PDFs
 int line(HPDF_Page *page,
 	 float r,float g,float b, float width,
 	 float x1,float y1, float x2,float y2)
@@ -268,6 +277,7 @@ int line(HPDF_Page *page,
   return 0;
 }
 
+// only needed to generate plot PDFs
 int dashed_line(HPDF_Page *page,
 		float r,float g,float b, float width,
 		float x1,float y1, float x2,float y2)
@@ -285,6 +295,7 @@ int dashed_line(HPDF_Page *page,
   return 0;
 }
 
+// only needed to generate plot PDFs
 float fig_width=6*72;
 float fig_height=5*72;
 float x_left=0.75*72;
@@ -293,6 +304,7 @@ float x_right=0.50*72;
 float y_top=0.25*72;
 HPDF_Font font_helvetica=NULL;
 
+// only needed to generate plot PDFs
 int draw_text(HPDF_Page *page,
 	      char *text, float size,
 	      float r, float g, float b,
@@ -326,6 +338,7 @@ int draw_text(HPDF_Page *page,
   return 0;
 }
 
+// only needed to generate plot PDFs
 int y_tick(HPDF_Page *page,int value,float barscale)
 {
   char value_string[1024];
@@ -347,6 +360,7 @@ int y_tick(HPDF_Page *page,int value,float barscale)
   return 0;
 }
 
+// only needed to generate plot PDFs
 int x_tick(HPDF_Page *page,char *text1, char *text2,
 	   int value,float barwidth, int phase)
 {
@@ -374,6 +388,7 @@ int x_tick(HPDF_Page *page,char *text1, char *text2,
   return 0;
 }
 
+// only needed to generate plot PDFs
 int draw_event(HPDF_Page *page,char *text,timestamp event_ts,
 	       timestamp *start,timestamp *end,
 	       float barwidth,int number)
@@ -413,6 +428,7 @@ int draw_event(HPDF_Page *page,char *text,timestamp event_ts,
   return 0;
 }
 
+// only needed to generate plot PDFs
 int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 					   int battery_life_in_hours,
 					   timestamp *start,timestamp *end,
@@ -561,17 +577,22 @@ int draw_pdf_barplot_flatbatteries_vs_time(char *filename,
 
 int main(int argc,char **argv)
 {
+  // check input arguments
   if (argc<3) {
     fprintf(stderr,"usage: analyse <battery life in hours> <data file> [start date] [end date]\n");
     exit(-1);
   }
 
+  // create pointers to time-strings
   char *start_epoch="01/01/2005";
   char *end_epoch="31/12/2016";
 
+  // check input args, and replace time-strings accordingly
   if (argc>3) start_epoch=argv[3];
   if (argc>4) end_epoch=argv[4];
 
+  // create array of pointers to chars
+  // BG: undocumented feature here, seems the events[] array can be initially populated using CLI input argc
   char *events[1024];
   int event_count=0;
   for(int e=5;e<argc;e++) {
@@ -579,7 +600,8 @@ int main(int argc,char **argv)
   }
   events[event_count]=NULL;
   
-  
+
+  // create time structures to allow easy time-comparisons  
   timestamp ts;
   ts_set(&ts,start_epoch);
   timestamp end_ts;
@@ -590,27 +612,41 @@ int main(int argc,char **argv)
 	  ts.mday,ts.month,ts.year,
 	  end_ts.mday,end_ts.month,end_ts.year);
     
+  // initialise all the values in the 'years' array to 'nothing'
   for(int i=0;i<10000;i++) years[i]=NULL;
-  
+
+  // seems to just delete the file.
+  // NOTE that this file is later opened and reused  
   unlink("flatbatteryhours_versus_batterylife.csv");
   
+  // convert the input argument of X hours, to be Y minutes, Y=X*60
+  // create a pointer to a string, which is the input data-file
   int max_battery_life_in_minutes=atoi(argv[1])*60;
   char *data_file=argv[2];
 
   battery_life_in_minutes=0;
   while(battery_life_in_minutes<=max_battery_life_in_minutes) {
-    
+
+    // here we do a loop, starting at zero, and going up to the desired battery life.
+    // the desired battery life was entered-in when you started the program, then x60.
+
+    // first time round this seems to do nothing because we already initialised these to zero, but
+    // within this loop, each iteration, we need to release the memory used pointed to by the years[]
     for(int i=0;i<10000;i++) {
       if (years[i]) free(years[i]);
       years[i]=NULL;
     }
     
+    // create some variables
+
     FILE *f=fopen(data_file,"r");
     
     char line[1024];
     int line_len=0;
     int c;
-    
+
+    // read in the input data-file, 
+    // at the end of each line, call the "process_line" function    
     while ((c=fgetc(f))!=EOF) {
       if (c>=' ') {
 	line[line_len++]=c;
@@ -620,23 +656,32 @@ int main(int argc,char **argv)
 	line_len=0;
       }
     }
+    // do one last function call to "process_line" with the last line of the file
     if (line_len) process_line(line,&ts,&end_ts);
 
+    // close the file.
     fclose(f);
+
+    // we are now finished reading the data-file, and have processed the incoming data
+    // insofar as we can now/later analyse the data.
     
     long long total=0;
 
+    // create a string representing the filename of the output file
     char filename[1024];
     snprintf(filename,1024,"numberofflatphones_by_hour_batterylife=%dhours.csv",
 	     battery_life_in_minutes/60);
 
+    // oopen the output file for writing
     f=fopen(filename,"w");
     
-    // Write hourly impact histogram
+    // Write hourly impact histogram (just the first line of the output file)
     fprintf(f,"time,flat_phones\n");
     int peak=0;
 
     timestamp cursor=ts;
+
+
     while(ts_notequal(&cursor,&end_ts)) {
       if (years[cursor.year]) {
 	int count=years[cursor.year]->counts[cursor.month][cursor.mday][cursor.hour];
